@@ -16,6 +16,7 @@ The solution implemented here consists of:
  
 - The `QueueManager` class, which performs a simulation of all the system
 - An unbounded `incomingMessagesQueue` queue that represents... well, the incoming messages queue
+- Messages are sketched by an `Integer` value that represents the client ID
 - A `threadPool` of size `N` that executes tasks that handle incoming messages in parallel
 - A `MessageDispatcher` class that runs in the main thread and encapsulates the mechanics to dispatch messages to available threads, as per the problem constraints and requirements
 - The `MessageDispatcher` class contains a `messageQueues` list containing up to `N` queues, with each queue sitting on top of each thread of the threadpool. These queues are used to dispatch messages that belong to one given client sequentially, as per the problem statement
