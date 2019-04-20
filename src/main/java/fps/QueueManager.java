@@ -27,8 +27,7 @@ public class QueueManager {
     // Queue used to notify about available threads
     private final BlockingQueue<Integer> availableThreads = new ArrayBlockingQueue<>(N);
 
-    private QueueManager() {
-
+    QueueManager() {
         // Initialize the incoming messages queue with sample messages
         incomingMessagesQueue.addAll(
                 MESSAGE_CLIENT_IDS.stream()
@@ -55,6 +54,7 @@ public class QueueManager {
 
     // Manage the queue (this is where all the action happens) :P
     private void manageQueue() {
+
         /*
          * GENERAL IDEA OF THE ALGORITHM:
          *
@@ -82,52 +82,66 @@ public class QueueManager {
          */
 
         // Map used to match message client IDs to dedicated queue numbers
-        Map<Integer, Integer> dispatchData = new ConcurrentHashMap<>(N);
+        Map<Integer, Integer> dispatchMap = new ConcurrentHashMap<>(N);
 
-        // Yep, run forever, unless we've been interrupted
-        while (!Thread.currentThread().isInterrupted()) {
+        // Yep, run forever (unless we're interrupted)
+        while (true) {
+
+            Message message;
             try {
                 // Block wait until an incoming message is available
-                Message message = incomingMessagesQueue.take();
+                message = incomingMessagesQueue.take();
 
-                Integer clientId = message.getClientId();
-
-                // Attempt to find a queue with messages from the same client ID
-                // If found, put the message directly in the queue
-                // If not, block wait until a dedicated queue is available
-                // and put the message there
-                dispatchData.compute(
-                        clientId,
-                        (unused, queueNumber) -> { // this code runs atomically
-                            // If found...
-                            if (queueNumber != null) {
-                                // Get dedicated queue and dispatch message
-                                dedicatedQueues.get(queueNumber).offer(message);
-                                // Let the value unchanged
-                                return queueNumber;
-                            }
-                            // If not found...
-                            Integer newQueueNumber;
-                            try {
-                                // Block wait until there's an available thread
-                                newQueueNumber = availableThreads.take();
-                                // Get dedicated queue and dispatch message
-                                dedicatedQueues.get(newQueueNumber).offer(message);
-                            } catch (InterruptedException e) {
-                                throw new UncheckedInterruptedException(e);
-                            }
-                            return newQueueNumber;
-                        });
             } catch (InterruptedException e) {
                 System.out.println("Interrupted while waiting for incoming message");
                 Thread.currentThread().interrupt();
-            } catch (UncheckedInterruptedException e) {
-                System.out.println("Interrupted while waiting for dedicated queue");
-                Thread.currentThread().interrupt();
+                // Honor interruption: break
+                break;
+            }
+
+            Integer clientId = message.getClientId();
+
+            // The dispatchToDedicatedQueue method executes atomically
+            // (because of ConcurrentHashMap.compute method)
+            Integer dispatchedQueueNumber = dispatchMap.compute(
+                    clientId,
+                    (unused, queueNumber) -> dispatchToDedicatedQueue(message, queueNumber));
+
+            // If message has not been dispatched (due to interruption)
+            if (dispatchedQueueNumber == null) {
+                // Honor interruption: break
+                break;
             }
         }
+
         // Shutdown gracefully, release resources, etc
         shutdown();
+    }
+
+    // Attempt to find a queue with messages from the same client ID
+    // If found, put the message directly in the queue
+    // If not, block wait until a dedicated queue is available
+    // and put the message there
+    private Integer dispatchToDedicatedQueue(Message message, Integer queueNumber) {
+
+        try {
+            // Get dedicated queue number
+            Integer newQueueNumber = queueNumber == null ?
+                    availableThreads.take() :
+                    queueNumber;
+
+            // Get dedicated queue and dispatch message
+            dedicatedQueues.get(newQueueNumber).offer(message);
+
+            // Return the new dedicated queue number,
+            // (which will also be put in the dispatchMap)
+            return newQueueNumber;
+
+        } catch (InterruptedException e) {
+            System.out.println("Interrupted while waiting for dedicated queue available");
+            Thread.currentThread().interrupt();
+            return null;
+        }
     }
 
     private void shutdown() {
@@ -145,8 +159,8 @@ public class QueueManager {
     }
 
     public static void main(String[] args) {
-        // Run the whole simulation:
-        // create sample messages and manage the queue forever
+        // Run the whole simulation
+        // Create sample messages and manage the queue forever
         new QueueManager().manageQueue();
     }
 }
