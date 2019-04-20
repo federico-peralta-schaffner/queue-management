@@ -19,7 +19,7 @@ The solution implemented here consists of:
 - Messages are sketched by an `Integer` value that represents the client ID
 - A `threadPool` of size `N` that executes tasks that handle incoming messages in parallel
 - A `MessageDispatcher` class that runs in the main thread and encapsulates the mechanics to dispatch messages to available threads, as per the problem constraints and requirements
-- The `MessageDispatcher` class contains a `messageQueues` list containing up to `N` queues, with each queue sitting on top of each thread of the threadpool. These queues are used to dispatch messages that belong to one given client sequentially, as per the problem statement
-- A `MessageRecipient` class that receives messages dispatched by the `MessageDispatcher` class and performs synchronization stuff before delegating the received message to its corresponding handler. This class executes within the threadpool
+- The `MessageDispatcher` class contains a `messageQueues` data structure containing up to `N` queues, with each queue sitting on top of each thread of the threadpool. These queues are used to dispatch messages that belong to one given client sequentially, as per the problem statement
+- A `MessageReceiver` class that receives messages dispatched by the `MessageDispatcher` class and performs synchronization stuff before delegating the received message to its corresponding handler. This class executes within the threadpool
 - A `MessageHandler` class that actually handles each message. Message handling is simulated here by sleeping 1 second and printing the client ID both at the start and end of the sleeping period. This class executes within the threadpool
 
