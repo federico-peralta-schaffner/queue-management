@@ -12,14 +12,16 @@
 
 ## Solution
 
-The solution implemented here consists of:
+This is a sketch of the solution, please read the comments in the code for further details...
  
-- The `QueueManager` class, which performs a simulation of all the system
-- An unbounded `incomingMessagesQueue` queue that represents... well, the incoming messages queue
-- Messages are sketched by an `Integer` value that represents the client ID
-- A `threadPool` of size `N` that executes tasks that handle incoming messages in parallel
-- A `MessageDispatcher` class that runs in the main thread and encapsulates the mechanics to dispatch messages to available threads, as per the problem constraints and requirements
-- The `MessageDispatcher` class contains a `messageQueues` data structure containing up to `N` queues, with each queue sitting on top of each thread of the threadpool. These queues are used to dispatch messages that belong to one given client sequentially, as per the problem statement
-- A `MessageReceiver` class that receives messages dispatched by the `MessageDispatcher` class and performs synchronization stuff before delegating the received message to its corresponding handler. This class executes within the threadpool
-- A `MessageHandler` class that actually handles each message. Message handling is simulated here by sleeping 1 second and printing the client ID both at the start and end of the sleeping period. This class executes within the threadpool
+The `QueueManager` class is the entry point of the simulation. Its `manageQueue` method is where most of the action happens.
 
+### General idea of the algorithm
+
+The `QueueManager.manageQueue` method runs forever in an infinite loop. Elements are polled from the **incoming messages queue** and dispatched whenever there's an available thread in the thread pool. Polling from the incoming messages queue is blocking, i.e. if there are no incoming messages, we wait.
+
+To guarantee that messages from a given client are processed sequentially, there are up to N dedicated queues that sit on top of each thread of the thread pool. Messages are dispatched from the incoming messages queue to either one of these dedicated queues, i.e. the incoming messages queue is *multiplexed* into N dedicated queues that are bound to each thread of the thread pool. We call this the **message dispatcher**.
+
+It never happens that different dedicated queues contain messages from the same client simultaneously. At any given time, messages from the same client are sent to the same dedicated queue, although it might happen that later, messages from this client are sent to another dedicated queue (i.e. when this dedicated queue is drained or if it contains messages from another client).
+
+Finally, there exists an *availableThreads* queue that is used to notify the message dispatcher that one dedicated queue has finished processing messages from a client, i.e. that it has been drained.
